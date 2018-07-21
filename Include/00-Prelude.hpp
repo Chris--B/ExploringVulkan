@@ -22,13 +22,13 @@ static_assert(false, "WE_HAVE_PRELUDE wasn't defined by the build system");
 // Include this after our OS header.
 #include <GLFW/glfw3.h>
 
-// ==== C Lib ===================================================================
+// ==== C Libs ==================================================================
 #include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 
-// MSVC missed the memo to include this.
+// MSVC missed the memo on including this.
 static constexpr float PI = 3.14159265358979323846f;
 
 // === STL ======================================================================
@@ -43,15 +43,16 @@ static constexpr float PI = 3.14159265358979323846f;
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/transform.hpp>
 
-// ==== Misc Macros ============================================================
-#define IMPL_STR(thing) # thing
-#define STR(thing) IMPL_STR(thing)
-
-#define UNUSED(var) (void)(var)
-
 // Math Typedefs
 using Vec3 = glm::vec3;
 using Mat4 = glm::mat4;
+
+// ==== Misc Macros ============================================================
+#define IMPL_STR(thing) # thing
+#define STR(thing)      IMPL_STR(thing)
+
+// Evaluates an expression, and suppresses unused warnings from the compiler.
+#define UNUSED(var)     (void)(var)
 
 // ==== Project Includes ========================================================
 // These headers assume everything in the prelude exists, so don't do anything

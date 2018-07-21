@@ -69,7 +69,7 @@ void _LogMsg(const char* pTag, Location&& location, const char* pFormat, ...);
         static_assert(std::is_same<VkResult, decltype(result)>::value,          \
                       "This macro expects a VkResult");                         \
         if (result != VK_SUCCESS) {                                             \
-            Bug("'%s' = %s", STR(result), TransVkResultToCStr(result));         \
+            Bug("'%s' = %s", STR(result), ToCStr(result));                      \
             DebugBreak();                                                       \
         }                                                                       \
     } while (false)

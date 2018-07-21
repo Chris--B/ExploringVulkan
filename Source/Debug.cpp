@@ -6,7 +6,7 @@
 using namespace Logging;
 
 // TODO: Expose this somewhere. CMake? Commandline args?
-static const bool kEnableVerboseLogging = false;
+static const bool kEnableVerboseLogging = true;
 
 // Sanitize a filename by removing a fixed prefix, set by CMake.
 // TODO: Sometimes full paths are nice, so it would be nice if
@@ -51,7 +51,7 @@ static const char* DePrefixFilename(const char* pFilename)
 static uint32_t LogMsgFormat(char* pBuffer,
                         uint32_t bufferSize,
                         const char* pTag,
-                        const Location& location,
+                        Location const& location,
                         const char* pFormat,
                         va_list args)
 {

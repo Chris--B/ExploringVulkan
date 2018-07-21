@@ -140,8 +140,7 @@ int main(int argc, char** argv)
     }
 
     {
-        const char* pEnvFullscreen = getEnvVarOr("FULLSCREEN", "0");
-        ctx.fullscreen = (strcmp(pEnvFullscreen, "1") == 0);
+        ctx.fullscreen = (strcmp(getEnvVarOr("FULLSCREEN", "0"), "1") == 0);
         if (ctx.fullscreen) {
             Info("Starting in fullscreen");
         }
@@ -173,6 +172,7 @@ int main(int argc, char** argv)
         AssertMsg(pWindow != nullptr, "Unable to create a GLFW window");
     }
 
+    // Set Glfw Callbacks
     glfwSetKeyCallback(pWindow, glfwKeyCallback);
     glfwSetFramebufferSizeCallback(pWindow, glfwFramebufferSizeCallback);
 
@@ -186,10 +186,14 @@ int main(int argc, char** argv)
                                             framebufferHeight);
 
     // ==== Renderer Init =======================================================
+    RendererInfo renderInfo;
+    renderInfo.pWindow           = pWindow;
+    renderInfo.framebufferWidth  = framebufferWidth;
+    renderInfo.framebufferHeight = framebufferHeight;
 
-    pWindow;
-    framebufferWidth;
-    framebufferHeight;
+    Renderer renderer;
+    VkResult result = renderer.init(renderInfo);
+    AssertVk(result);
 
     // Load a model!
     {
