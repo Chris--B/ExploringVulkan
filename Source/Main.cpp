@@ -162,7 +162,7 @@ int main(int argc, char** argv)
         Info("Window resolution: %d x %d", ctx.width, ctx.height);
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, false);
+        glfwWindowHint(GLFW_RESIZABLE, true);
         pWindow = glfwCreateWindow(ctx.width,
                                    ctx.height,
                                    "Hello Vulkan!",

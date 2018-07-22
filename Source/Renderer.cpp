@@ -28,7 +28,7 @@ VkResult Renderer::init(RendererInfo const& info)
     // Init m_vkPhysicalDevice
     result = createPhysicalDevice();
 
-    // Init m_vkDevice();
+    // Init m_vkDevice
     result = createDevice();
 
     // Init m_vkSurface
@@ -47,7 +47,9 @@ VkResult Renderer::createLayers()
 {
     VkResult result;
 
-    //m_layers.push_back("VK_LAYER_LUNARG_standard_validation");
+    // TODO: This crashes in present after upgrading Windows and not
+    //       updating the Nvidia drivers
+    m_layers.push_back("VK_LAYER_LUNARG_standard_validation");
     if (!OS_MACOS) {
         m_layers.push_back("VK_LAYER_LUNARG_monitor");
     }
@@ -56,7 +58,8 @@ VkResult Renderer::createLayers()
     result = vkEnumerateInstanceLayerProperties(&countLayers, nullptr);
     AssertVk(result);
 
-    std::vector<VkLayerProperties> availableLayers(countLayers);
+    auto& availableLayers = m_queriedInfo.availableLayers;
+    availableLayers.resize(countLayers);
     result = vkEnumerateInstanceLayerProperties(&countLayers,
                                                 availableLayers.data());
     AssertVk(result);
@@ -116,7 +119,8 @@ VkResult Renderer::createInstance()
                                                     nullptr);
     AssertVk(result);
 
-    std::vector<VkExtensionProperties> availableInstExts(instExtsCount);
+    auto& availableInstExts = m_queriedInfo.availableInstExts;
+    availableInstExts.resize(instExtsCount);
     result = vkEnumerateInstanceExtensionProperties(nullptr,
                                                     &instExtsCount,
                                                     &availableInstExts[0]);
@@ -132,11 +136,13 @@ VkResult Renderer::createInstance()
 
     // Pick our instance extensions
     instExtsCount = 0;
-    auto* glfwInstExts = glfwGetRequiredInstanceExtensions(&instExtsCount);
+    const char** glfwInstExts = glfwGetRequiredInstanceExtensions(&instExtsCount);
     Assert(glfwInstExts != nullptr);
 
-    std::vector<const char*> enabledInstExts(&glfwInstExts[0],
-                                             &glfwInstExts[instExtsCount]);
+    auto& enabledInstExts = m_queriedInfo.enabledInstExts;
+    std::copy(&glfwInstExts[0],
+              &glfwInstExts[instExtsCount],
+              std::back_inserter(enabledInstExts));
 
     // Any extensions we want to add go here.
     // Right now, it's just Glfw's required extensions.
@@ -194,7 +200,11 @@ VkResult Renderer::createPhysicalDevice()
     Assert(m_vkPhysicalDevice != nullptr);
 
     for (const auto& device : physicalDevices) {
-        VkPhysicalDeviceProperties deviceProperties = {};
+        m_queriedInfo.physicalDeviceInfos.emplace_back();
+        auto& deviceInfo = m_queriedInfo.physicalDeviceInfos.back();
+        deviceInfo.device = device;
+
+        VkPhysicalDeviceProperties& deviceProperties = deviceInfo.properties;
         vkGetPhysicalDeviceProperties(device, &deviceProperties);
 
         Verbose("%s Info\n"
@@ -208,10 +218,16 @@ VkResult Renderer::createPhysicalDevice()
             VK_VERSION_MINOR(deviceProperties.apiVersion),
             VK_VERSION_PATCH(deviceProperties.apiVersion));
 
-        VkPhysicalDeviceFeatures dev_features = {};
-        vkGetPhysicalDeviceFeatures(device, &dev_features);
+        auto& memoryProperties = deviceInfo.memoryProperties;
+        vkGetPhysicalDeviceMemoryProperties(m_vkPhysicalDevice,
+                                            &memoryProperties);
+
+        // Anything about memoryProperties to print out?
+
+        VkPhysicalDeviceFeatures& features = deviceInfo.features;
+        vkGetPhysicalDeviceFeatures(device, &features);
         // Print all of the properties!
-        std::string dev_features_str = ToStr(dev_features);
+        std::string dev_features_str = ToStr(features);
         Verbose("%s Physical Device Features:\n%s",
             deviceProperties.deviceName,
             dev_features_str.c_str());
@@ -223,7 +239,8 @@ VkResult Renderer::createPhysicalDevice()
                                              nullptr);
         Assert(deviceExtCount > 0);
 
-        std::vector<VkExtensionProperties> availableDeviceExts(deviceExtCount);
+        auto& availableDeviceExts = deviceInfo.availableDeviceExts;
+        availableDeviceExts.resize(deviceExtCount);
         vkEnumerateDeviceExtensionProperties(device,
                                              nullptr,
                                              &deviceExtCount,
@@ -270,7 +287,7 @@ VkResult Renderer::createDevice()
     VkResult result = VK_SUCCESS;
 
     // Choose device extensions
-    std::vector<const char*> enabledExts;
+    auto& enabledExts = m_queriedInfo.enabledDeviceExts;
     enabledExts.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
     if (OS_MACOS) {
@@ -295,7 +312,8 @@ VkResult Renderer::createDevice()
     vkGetPhysicalDeviceQueueFamilyProperties(m_vkPhysicalDevice,
                                              &queueFamilyCount,
                                              nullptr);
-    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    auto& queueFamilies = m_queriedInfo.queueFamilies;
+    queueFamilies.resize(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(m_vkPhysicalDevice,
                                              &queueFamilyCount,
                                              queueFamilies.data());
@@ -331,10 +349,6 @@ VkResult Renderer::createDevice()
     }
 
     // Actually create the device
-    VkPhysicalDeviceMemoryProperties memoryProperties;
-    vkGetPhysicalDeviceMemoryProperties(m_vkPhysicalDevice,
-                                        &memoryProperties);
-
     VkDeviceQueueCreateInfo queueInfo = {};
     queueInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queueInfo.queueFamilyIndex = queueFamilyIndex;
@@ -372,7 +386,7 @@ VkResult Renderer::createSwapChain()
     // Query a bunch of stuff about the surface
 
     //
-    VkSurfaceCapabilitiesKHR surfaceCapabilities = {};
+    auto& surfaceCapabilities = m_queriedInfo.surfaceCapabilities;
     result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_vkPhysicalDevice,
                                                        m_vkSurface,
                                                        &surfaceCapabilities);
@@ -395,7 +409,8 @@ VkResult Renderer::createSwapChain()
                                                   &surfaceFormatsCount,
                                                   nullptr);
     AssertVk(result);
-    std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatsCount);
+    auto& surfaceFormats = m_queriedInfo.surfaceFormats;
+    surfaceFormats.resize(surfaceFormatsCount);
     result = vkGetPhysicalDeviceSurfaceFormatsKHR(m_vkPhysicalDevice,
                                                   m_vkSurface,
                                                   &surfaceFormatsCount,
@@ -409,7 +424,8 @@ VkResult Renderer::createSwapChain()
                                                        &surfacePresentModesCount,
                                                        nullptr);
     AssertVk(result);
-    std::vector<VkPresentModeKHR> surfacePresentModes(surfacePresentModesCount);
+    auto& surfacePresentModes = m_queriedInfo.surfacePresentModes;
+    surfacePresentModes.resize(surfacePresentModesCount);
     result = vkGetPhysicalDeviceSurfacePresentModesKHR(m_vkPhysicalDevice,
                                                        m_vkSurface,
                                                        &surfacePresentModesCount,

@@ -13,6 +13,38 @@ struct RendererInfo
     int         framebufferHeight   = 0;
 };
 
+// Information queried from Vulkan about devices, capabilities, formats. etc.
+struct QueriedVulkanInfo
+{
+    QueriedVulkanInfo() = default;
+
+    // These are ordered roughly in the order that they are initialized.
+
+    std::vector<VkLayerProperties>          availableLayers;
+    std::vector<VkExtensionProperties>      availableInstExts;
+    std::vector<const char*>                enabledInstExts;
+
+    struct PhysicalDeviceInfo
+    {
+        PhysicalDeviceInfo() = default;
+
+        VkPhysicalDevice                    device                  = nullptr;
+        VkPhysicalDeviceProperties          properties              = {};
+        VkPhysicalDeviceFeatures            features                = {};
+        VkPhysicalDeviceMemoryProperties    memoryProperties        = {};
+        std::vector<VkExtensionProperties>  availableDeviceExts;
+    };
+    std::vector<PhysicalDeviceInfo>         physicalDeviceInfos;
+
+    std::vector<const char*>                enabledDeviceExts;
+    std::vector<VkQueueFamilyProperties>    queueFamilies;
+
+    VkSurfaceCapabilitiesKHR                surfaceCapabilities     = {};
+    std::vector<VkSurfaceFormatKHR>         surfaceFormats;
+    std::vector<VkPresentModeKHR>           surfacePresentModes;
+
+};
+
 class Renderer
 {
     public:
@@ -70,6 +102,8 @@ class Renderer
 
         // ???
         VkFence                     m_vkUnknownFence            = nullptr;
+
+        QueriedVulkanInfo           m_queriedInfo;
 
         std::vector<const char*>    m_layers;
         std::string                 m_logger;

@@ -6,7 +6,8 @@
 using namespace Logging;
 
 // TODO: Expose this somewhere. CMake? Commandline args?
-static const bool kEnableVerboseLogging = true;
+// This can be edited in a debugger.
+volatile bool kEnableVerboseLogging = false;
 
 // Sanitize a filename by removing a fixed prefix, set by CMake.
 // TODO: Sometimes full paths are nice, so it would be nice if
