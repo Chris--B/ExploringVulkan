@@ -97,7 +97,8 @@ const char* getEnvVarOr(const char* pEnvName, const char* pDefaultStr = "")
     return pDefaultStr;
 }
 
-int main(int argc, char** argv)
+// This lets us wrap our entire program in signal/SEH handlers.
+int real_main(int argc, char** argv)
 {
     if (argc == 1) {
         printf("%d arg:\n", argc);
@@ -258,14 +259,56 @@ int main(int argc, char** argv)
     }
 
     glfwTerminate();
+
+    return 0;
 }
 
 #if OS_WINDOWS
+
+int main(int argc, char** argv)
+{
+    __try {
+        return real_main(argc, argv);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        // Why are we here?
+        unsigned long code = GetExceptionCode();
+        const char* pExceptionStr = "?????";
+        switch (code)
+        {
+            // Exceptions that I expect to bump into - there are others!
+            case EXCEPTION_ACCESS_VIOLATION:
+                pExceptionStr = "EXCEPTION_ACCESS_VIOLATION";
+                break;
+            case EXCEPTION_BREAKPOINT:
+                pExceptionStr = "EXCEPTION_BREAKPOINT";
+                break;
+            case EXCEPTION_DATATYPE_MISALIGNMENT:
+                pExceptionStr = "EXCEPTION_DATATYPE_MISALIGNMENT";
+                break;
+            case EXCEPTION_STACK_OVERFLOW:
+                pExceptionStr = "EXCEPTION_STACK_OVERFLOW";
+                break;
+            case CONTROL_C_EXIT:
+                pExceptionStr = "CONTROL_C_EXIT";
+                break;
+        }
+
+        printf("SEH 0x%x - %s\n", code, pExceptionStr);
+    }
+}
+
+// This only runs if the subsystem is set to WIN32.
 int WINAPI WinMain(HINSTANCE /* hInstance     */,
                    HINSTANCE /* hPrevInstance */,
                    LPSTR     /* lpCmdLine     */,
                    int       /* nCmdShow      */)
 {
     main(__argc, __argv);
+}
+#else
+// TODO: Posix signal magic
+int main(int argc, char** argv)
+{
+    return real_main(argc, argv);
 }
 #endif
