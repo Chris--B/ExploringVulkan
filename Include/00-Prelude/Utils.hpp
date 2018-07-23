@@ -62,9 +62,6 @@ constexpr const char* ToCStr(VkResult result)
         TO_CSTR_CASE(VK_ERROR_INCOMPATIBLE_DISPLAY_KHR)
         TO_CSTR_CASE(VK_ERROR_VALIDATION_FAILED_EXT)
         TO_CSTR_CASE(VK_ERROR_INVALID_SHADER_NV)
-        TO_CSTR_CASE(VK_ERROR_OUT_OF_POOL_MEMORY_KHR)
-        TO_CSTR_CASE(VK_ERROR_INVALID_EXTERNAL_HANDLE_KHR)
-        TO_CSTR_CASE(VK_ERROR_NOT_PERMITTED_EXT)
         default:
             return "Unknown VkResult Value";
     }

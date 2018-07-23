@@ -19,6 +19,8 @@ VkResult Renderer::init(RendererInfo const& info)
 
     VkResult result;
 
+    Info("Built with Vulkan SDK %d", VK_HEADER_VERSION);
+
     // Init m_layers
     result = createLayers();
 
