@@ -49,13 +49,6 @@ VkResult Renderer::createLayers()
 {
     VkResult result;
 
-    // TODO: This crashes in present after upgrading Windows and not
-    //       updating the Nvidia drivers
-    m_layers.push_back("VK_LAYER_LUNARG_standard_validation");
-    if (!OS_MACOS) {
-        m_layers.push_back("VK_LAYER_LUNARG_monitor");
-    }
-
     uint32_t countLayers = 0;
     result = vkEnumerateInstanceLayerProperties(&countLayers, nullptr);
     AssertVk(result);
@@ -71,23 +64,37 @@ VkResult Renderer::createLayers()
         m_logger.append("\n    ");
         m_logger.append(prop.layerName);
     }
-    Info("Found %d layers", countLayers);
-    Verbose("Instance layers found:%s", m_logger.c_str());
+    Info("Found %d layers:%s", availableLayers.size(), m_logger.c_str());
     m_logger.clear();
 
-    // Make sure we have the layers we want.
-    for (const char* pLayerName : m_layers) {
-        auto found = std::find_if(availableLayers.begin(),
-            availableLayers.end(),
-            [&pLayerName](VkLayerProperties const& thisLayer) {
-            return (strcmp(thisLayer.layerName, pLayerName) == 0);
-        });
-        if (found == availableLayers.end()) {
-            Bug("Unable to find layer '%s'", pLayerName);
-            // TODO: User-friendly error message + abort
-            DebugBreak();
+    static constexpr const char* wantedLayers[] = {
+        "VK_LAYER_LUNARG_standard_validation",
+        #if !OS_MACOS
+            "VK_LAYER_LUNARG_monitor",
+        #endif
+    };
+
+    auto begin = std::begin(availableLayers);
+    auto end   = std::end(availableLayers);
+    for (const char* const pLayer : wantedLayers) {
+        auto it = std::find_if(begin, end,
+                              [&pLayer](VkLayerProperties const& props) -> bool {
+                                    return (strcmp(props.layerName, pLayer) == 0);
+                              });
+        if (it != end) {
+            m_layers.push_back(pLayer);
+        } else {
+            Info("Unable to find vulkan layer \"%s\"", pLayer);
         }
     }
+
+    // Log the enabled layers
+    for (const char* pLayerName : m_layers) {
+        m_logger.append("\n    ");
+        m_logger.append(pLayerName);
+    }
+    Info("Using %d layers:%s", m_layers.size(), m_logger.c_str());
+    m_logger.clear();
 
     return result;
 }
@@ -299,7 +306,7 @@ VkResult Renderer::createDevice()
     }
 
     if (OS_WINDOWS) {
-        enabledExts.push_back("VK_KHR_maintenance1");
+         enabledExts.push_back("VK_KHR_maintenance1");
     }
 
     Info("Using %d device extensions", enabledExts.size());

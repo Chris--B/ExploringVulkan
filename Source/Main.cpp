@@ -293,7 +293,7 @@ int main(int argc, char** argv)
                 break;
         }
 
-        printf("SEH 0x%x - %s\n", code, pExceptionStr);
+        printf("\nSEH 0x%x - %s\n", code, pExceptionStr);
     }
 }
 
