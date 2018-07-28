@@ -54,10 +54,13 @@ class Renderer
         VkResult                    init(RendererInfo const& info);
         void                        deInit();
 
+        // VkAllocationCallbacks const* getAlloc() const { return &m_vkAlloc; }
+        VkAllocationCallbacks const* getAlloc() const { return nullptr; }
+
     private:
 
         // Windowing object
-        GLFWwindow*                 m_pGflwWindow               = nullptr;
+        GLFWwindow*                 m_pGlfwWindow               = nullptr;
 
         // ---- Vulkan objects --------------------------------------------------
 
@@ -65,12 +68,13 @@ class Renderer
         VkInstance                  m_vkInstance                = nullptr;
         VkPhysicalDevice            m_vkPhysicalDevice          = nullptr;
         VkDevice                    m_vkDevice                  = nullptr;
+        VkAllocationCallbacks       m_vkAlloc                   = {}; // TODO
 
         // Presentation objects
         VkSurfaceKHR                m_vkSurface                 = nullptr;
         VkSwapchainKHR              m_vkSwapchain               = nullptr;
-        VkImage                     m_vkPresentImage            = nullptr;
-        VkImageView                 m_vkPresentImageView        = nullptr;
+        VkImage                     m_vkPresentImages[2]        = {};
+        VkImageView                 m_vkPresentImageViews[2]    = {};
         VkQueue                     m_vkPresentQueue            = nullptr;
         VkSemaphore                 m_vkRenderSemaphore         = nullptr;
 
@@ -113,4 +117,7 @@ class Renderer
         VkResult                    createPhysicalDevice();
         VkResult                    createDevice();
         VkResult                    createSwapChain();
+        VkResult                    createPresentImages();
+        VkResult                    createCommandPool();
+        VkResult                    createDepthBuffer(VkExtent3D const& extent);
 };

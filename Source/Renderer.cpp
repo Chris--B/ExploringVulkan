@@ -15,9 +15,20 @@ void Renderer::deInit()
 VkResult Renderer::init(RendererInfo const& info)
 {
     m_logger.reserve(255);
-    m_pGflwWindow = info.pWindow;
+    m_pGlfwWindow = info.pWindow;
+    glfwSetWindowUserPointer(m_pGlfwWindow, this);
 
     VkResult result;
+
+    VkExtent2D extent2d = {
+        /*width*/  as<uint32_t>(info.framebufferWidth),
+        /*height*/ as<uint32_t>(info.framebufferWidth),
+    };
+    VkExtent3D extent3d = {
+        /*width*/  as<uint32_t>(info.framebufferWidth),
+        /*height*/ as<uint32_t>(info.framebufferWidth),
+        /*depth*/  1
+    };
 
     Info("Built with Vulkan SDK %d", VK_HEADER_VERSION);
 
@@ -35,12 +46,21 @@ VkResult Renderer::init(RendererInfo const& info)
 
     // Init m_vkSurface
     result = glfwCreateWindowSurface(m_vkInstance,
-                                     m_pGflwWindow,
+                                     m_pGlfwWindow,
                                      nullptr,
                                      &m_vkSurface);
 
     // Create a swapchain
     result = createSwapChain();
+
+    // Init m_vkPresentImages, and m_vkPresentImageViews
+    result = createPresentImages();
+
+    // Init m_vkCommandPool
+    result = createCommandPool();
+
+    // Init m_vkDepthImage, m_vkDepthImageView, and m_vkDepthDeviceMemory
+    result = createDepthBuffer(extent3d);
 
     return result;
 }
@@ -77,10 +97,11 @@ VkResult Renderer::createLayers()
     auto begin = std::begin(availableLayers);
     auto end   = std::end(availableLayers);
     for (const char* const pLayer : wantedLayers) {
-        auto it = std::find_if(begin, end,
-                              [&pLayer](VkLayerProperties const& props) -> bool {
-                                    return (strcmp(props.layerName, pLayer) == 0);
-                              });
+        auto preditcate = [pLayer](VkLayerProperties const& props) -> bool {
+            return (strcmp(props.layerName, pLayer) == 0);
+        };
+        auto it = std::find_if(begin, end, preditcate);
+
         if (it != end) {
             m_layers.push_back(pLayer);
         } else {
@@ -356,6 +377,7 @@ VkResult Renderer::createDevice()
             queueFamilyIndex = i;
         }
     }
+    Info("Using queue family #%d", queueFamilyIndex);
 
     // Actually create the device
     VkDeviceQueueCreateInfo queueInfo = {};
@@ -472,6 +494,140 @@ VkResult Renderer::createSwapChain()
                                   &m_vkSwapchain);
     AssertVk(result);
     Assert(m_vkSwapchain != nullptr);
+
+    return result;
+}
+
+VkResult Renderer::createPresentImages()
+{
+    VkResult result;
+
+    // VkImage
+    uint32_t n_images = 0;
+    result = vkGetSwapchainImagesKHR(m_vkDevice, m_vkSwapchain, &n_images,
+                                     nullptr);
+    AssertMsg(n_images == array_size(m_vkPresentImages),
+              "Expected %d present images, but got %d",
+              array_size(m_vkPresentImages),
+              n_images);
+    AssertVk(result);
+    result = vkGetSwapchainImagesKHR(m_vkDevice, m_vkSwapchain, &n_images,
+                                     &m_vkPresentImages[0]);
+    AssertVk(result);
+
+    VkImageViewCreateInfo viewInfo = {};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format                          = VK_FORMAT_B8G8R8A8_UNORM;
+    viewInfo.components.r                    = VK_COMPONENT_SWIZZLE_R;
+    viewInfo.components.g                    = VK_COMPONENT_SWIZZLE_G;
+    viewInfo.components.b                    = VK_COMPONENT_SWIZZLE_B;
+    viewInfo.components.a                    = VK_COMPONENT_SWIZZLE_A;
+    viewInfo.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewInfo.subresourceRange.baseMipLevel   = 0;
+    viewInfo.subresourceRange.levelCount     = 1;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount     = 1;
+
+    for (uint32_t i = 0; i < array_size(m_vkPresentImages); i += 1) {
+        viewInfo.image = m_vkPresentImages[i];
+        result = vkCreateImageView(m_vkDevice, &viewInfo, nullptr,
+                                   &m_vkPresentImageViews[i]);
+        AssertVk(result);
+    }
+
+    // Where do I need this?
+    vkGetDeviceQueue(m_vkDevice, 0 /*queueFamilyIndex*/, 0 /*queueIndex*/,
+                     &m_vkPresentQueue);
+
+    return result;
+}
+
+VkResult Renderer::createCommandPool()
+{
+    VkResult result;
+
+    VkCommandPoolCreateInfo poolInfo = {};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolInfo.queueFamilyIndex = 0; // ??
+
+    result = vkCreateCommandPool(m_vkDevice, &poolInfo, nullptr,
+                                 &m_vkCommandPool);
+
+    return result;
+}
+
+VkResult Renderer::createDepthBuffer(VkExtent3D const& extent)
+{
+    VkResult result;
+
+    // m_vkDepthImage
+    VkImageCreateInfo imageInfo = {};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType     = VK_IMAGE_TYPE_2D;
+    imageInfo.extent        = extent;
+    imageInfo.mipLevels     = 1;
+    imageInfo.arrayLayers   = 1;
+    imageInfo.format        = VK_FORMAT_D32_SFLOAT;
+    imageInfo.tiling        = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage         = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    imageInfo.samples       = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+
+    result = vkCreateImage(m_vkDevice, &imageInfo, nullptr, &m_vkDepthImage);
+    AssertVk(result);
+
+    // Allocate
+    VkMemoryRequirements memReq = {};
+    vkGetImageMemoryRequirements(m_vkDevice, m_vkDepthImage, &memReq);
+
+    VkMemoryAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize  = memReq.size;
+    allocInfo.memoryTypeIndex = VK_MAX_MEMORY_TYPES;
+
+    // TODO: This should be a function.
+    {
+        VkPhysicalDeviceMemoryProperties memoryProperties = {};
+        vkGetPhysicalDeviceMemoryProperties(m_vkPhysicalDevice,
+                                            &memoryProperties);
+        for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
+            // Use the first memory type that works.
+            if (memReq.memoryTypeBits & (1u << i)) {
+                allocInfo.memoryTypeIndex = i;
+                break;
+            }
+        }
+        AssertMsg(allocInfo.memoryTypeIndex < memoryProperties.memoryTypeCount,
+                  "Couldn't find a valid memory type index");
+    }
+    result = vkAllocateMemory(m_vkDevice, &allocInfo, nullptr,
+                              &m_vkDepthDeviceMemory);
+    AssertVk(result);
+
+    constexpr VkDeviceSize memoryOffset = 0;
+    result = vkBindImageMemory(m_vkDevice, m_vkDepthImage, m_vkDepthDeviceMemory,
+                               memoryOffset);
+    AssertVk(result);
+
+    // m_vkDepthImageView
+    VkImageViewCreateInfo viewInfo = {};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+
+    viewInfo.flags    = 0;
+    viewInfo.image    = m_vkDepthImage;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format   = VK_FORMAT_D32_SFLOAT;
+
+    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.layerCount = 1;
+
+    result = vkCreateImageView(m_vkDevice, &viewInfo, nullptr,
+                               &m_vkDepthImageView);
+    AssertVk(result);
 
     return result;
 }
