@@ -19,7 +19,7 @@ const U as(T const& other)    { return static_cast<U>(other); }
 // Shorthand for `reinterpret_cast`
 template<typename U, typename T>
 [[nodiscard]]
-U* ptr_as(const T* other) { return reinterpret_cast<U*>(other); }
+U* ptr_as(T* other) { return reinterpret_cast<U*>(other); }
 
 
 [[nodiscard]]

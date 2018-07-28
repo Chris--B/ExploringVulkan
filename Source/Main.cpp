@@ -153,12 +153,12 @@ int real_main(int argc, char** argv)
         const auto* pVidmode = glfwGetVideoMode(pMonitor);
         if (ctx.fullscreen) {
             ctx.height = pVidmode->height;
-            ctx.width = pVidmode->width;
+            ctx.width  = pVidmode->width;
         } else {
-            pMonitor = nullptr; // Tell Glfw to go windowed
+            pMonitor   = nullptr; // Tell Glfw to go windowed
             ctx.height = pVidmode->height / 2;
-            ctx.width = std::min(as<uint32_t>(pVidmode->height / 1.6),
-                                 as<uint32_t>(pVidmode->width));
+            ctx.width  = std::min(as<uint32_t>(pVidmode->height / 1.6),
+                                  as<uint32_t>(pVidmode->width));
         }
         Info("Window resolution: %d x %d", ctx.width, ctx.height);
 
@@ -187,13 +187,13 @@ int real_main(int argc, char** argv)
                                             framebufferHeight);
 
     // ==== Renderer Init =======================================================
-    RendererInfo renderInfo;
-    renderInfo.pWindow           = pWindow;
-    renderInfo.framebufferWidth  = framebufferWidth;
-    renderInfo.framebufferHeight = framebufferHeight;
+    RendererInfo rendererInfo;
+    rendererInfo.pWindow           = pWindow;
+    rendererInfo.framebufferWidth  = framebufferWidth;
+    rendererInfo.framebufferHeight = framebufferHeight;
 
     Renderer renderer;
-    VkResult result = renderer.init(renderInfo);
+    VkResult result = renderer.init(rendererInfo);
     AssertVk(result);
 
     // Load a model!
@@ -256,6 +256,9 @@ int real_main(int argc, char** argv)
     // Main loop
     while (!glfwWindowShouldClose(pWindow)) {
         glfwPollEvents();
+
+        renderer.doOneFrame();
+
     }
 
     glfwTerminate();

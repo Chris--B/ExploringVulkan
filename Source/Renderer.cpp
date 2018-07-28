@@ -18,15 +18,17 @@ VkResult Renderer::init(RendererInfo const& info)
     m_pGlfwWindow = info.pWindow;
     glfwSetWindowUserPointer(m_pGlfwWindow, this);
 
+    Info("sizeof(Renderer) == %zu", sizeof(*this));
+
     VkResult result;
 
     VkExtent2D extent2d = {
         /*width*/  as<uint32_t>(info.framebufferWidth),
-        /*height*/ as<uint32_t>(info.framebufferWidth),
+        /*height*/ as<uint32_t>(info.framebufferHeight),
     };
     VkExtent3D extent3d = {
         /*width*/  as<uint32_t>(info.framebufferWidth),
-        /*height*/ as<uint32_t>(info.framebufferWidth),
+        /*height*/ as<uint32_t>(info.framebufferHeight),
         /*depth*/  1
     };
 
@@ -43,6 +45,25 @@ VkResult Renderer::init(RendererInfo const& info)
 
     // Init m_vkDevice
     result = createDevice();
+
+    // Init Semaphores and Fences.
+    {
+        VkSemaphoreCreateInfo semaphoreInfo = {};
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        semaphoreInfo.flags = 0;
+        result = vkCreateSemaphore(m_vkDevice,
+                                   &semaphoreInfo,
+                                   getVkAlloc(),
+                                   &m_vkRenderSemaphore);
+        AssertVk(result);
+
+        VkFenceCreateInfo fenceInfo = {};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceInfo.flags = 0;
+        result = vkCreateFence(m_vkDevice, &fenceInfo, getVkAlloc(),
+                               &m_vkUnknownFence);
+        AssertVk(result);
+    }
 
     // Init m_vkSurface
     result = glfwCreateWindowSurface(m_vkInstance,
@@ -62,7 +83,15 @@ VkResult Renderer::init(RendererInfo const& info)
     // Init m_vkDepthImage, m_vkDepthImageView, and m_vkDepthDeviceMemory
     result = createDepthBuffer(extent3d);
 
+    // Init m_Framebuffer, and ???
+    result = createRenderPassAndFramebuffer(extent3d);
+
     return result;
+}
+
+void     Renderer::doOneFrame()
+{
+
 }
 
 VkResult Renderer::createLayers()
@@ -225,11 +254,7 @@ VkResult Renderer::createPhysicalDevice()
                                         &physicalDevices[0]);
     AssertVk(result);
 
-    Info("Found %d physical device(s)", deviceCount);
-    m_vkPhysicalDevice = physicalDevices[0];
-    Assert(m_vkPhysicalDevice != nullptr);
-
-    for (const auto& device : physicalDevices) {
+    for (auto const& device : physicalDevices) {
         m_queriedInfo.physicalDeviceInfos.emplace_back();
         auto& deviceInfo = m_queriedInfo.physicalDeviceInfos.back();
         deviceInfo.device = device;
@@ -249,7 +274,7 @@ VkResult Renderer::createPhysicalDevice()
             VK_VERSION_PATCH(deviceProperties.apiVersion));
 
         auto& memoryProperties = deviceInfo.memoryProperties;
-        vkGetPhysicalDeviceMemoryProperties(m_vkPhysicalDevice,
+        vkGetPhysicalDeviceMemoryProperties(device,
                                             &memoryProperties);
 
         // Anything about memoryProperties to print out?
@@ -298,16 +323,21 @@ VkResult Renderer::createPhysicalDevice()
         m_logger.clear();
     }
 
+    // Pretend we did something more involved here.
+    m_queriedInfo.physicalDeviceIndex = 0;
+
+    m_vkPhysicalDevice = physicalDevices[m_queriedInfo.physicalDeviceIndex];
+    Assert(m_vkPhysicalDevice != nullptr);
+
     VkPhysicalDeviceProperties deviceProperties = {};
     vkGetPhysicalDeviceProperties(m_vkPhysicalDevice, &deviceProperties);
 
-    uint32_t apiMajor = VK_VERSION_MAJOR(deviceProperties.apiVersion);
-    uint32_t apiMinor = VK_VERSION_MINOR(deviceProperties.apiVersion);
-    uint32_t apiPatch = VK_VERSION_PATCH(deviceProperties.apiVersion);
-    Info("Using '%s' and Vulkan %d.%d.%d", deviceProperties.deviceName,
-                                           apiMajor,
-                                           apiMinor,
-                                           apiPatch);
+    Info("Found %d physical device(s)", physicalDevices.size());
+    Info("Using '%s' with Vulkan %d.%d.%d",
+         deviceProperties.deviceName,
+         VK_VERSION_MAJOR(deviceProperties.apiVersion),
+         VK_VERSION_MINOR(deviceProperties.apiVersion),
+         VK_VERSION_PATCH(deviceProperties.apiVersion));
 
     return result;
 }
@@ -506,10 +536,8 @@ VkResult Renderer::createPresentImages()
     uint32_t n_images = 0;
     result = vkGetSwapchainImagesKHR(m_vkDevice, m_vkSwapchain, &n_images,
                                      nullptr);
-    AssertMsg(n_images == array_size(m_vkPresentImages),
-              "Expected %d present images, but got %d",
-              array_size(m_vkPresentImages),
-              n_images);
+    AssertMsg(n_images == Renderer::N,
+              "Expected %d present images, but got %d", Renderer::N, n_images);
     AssertVk(result);
     result = vkGetSwapchainImagesKHR(m_vkDevice, m_vkSwapchain, &n_images,
                                      &m_vkPresentImages[0]);
@@ -517,6 +545,7 @@ VkResult Renderer::createPresentImages()
 
     VkImageViewCreateInfo viewInfo = {};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.flags                           = 0;
     viewInfo.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format                          = VK_FORMAT_B8G8R8A8_UNORM;
     viewInfo.components.r                    = VK_COMPONENT_SWIZZLE_R;
@@ -628,6 +657,111 @@ VkResult Renderer::createDepthBuffer(VkExtent3D const& extent)
     result = vkCreateImageView(m_vkDevice, &viewInfo, nullptr,
                                &m_vkDepthImageView);
     AssertVk(result);
+
+    return result;
+}
+
+VkResult Renderer::createRenderPassAndFramebuffer(VkExtent3D const& extent)
+{
+    VkResult result;
+
+    uint32_t attachmentCount = 0;
+
+    // Presentable Color Attachment
+    VkAttachmentDescription colorDesc = {};
+    colorDesc.format         = VK_FORMAT_B8G8R8A8_UNORM;
+    colorDesc.samples        = VK_SAMPLE_COUNT_1_BIT;
+    colorDesc.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorDesc.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
+    colorDesc.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorDesc.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorDesc.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentReference colorRef = {};
+    colorRef.attachment = attachmentCount;
+    colorRef.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    attachmentCount += 1;
+
+    // Depth Attachment
+    VkAttachmentDescription depthDesc = {};
+    depthDesc.format         = VK_FORMAT_D32_SFLOAT;
+    depthDesc.samples        = VK_SAMPLE_COUNT_1_BIT;
+    depthDesc.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthDesc.storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthDesc.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthDesc.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthDesc.finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthRef = {};
+    depthRef.attachment = attachmentCount;
+    depthRef.layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    attachmentCount += 1;
+
+    VkAttachmentReference colorRefs[] = {
+        colorRef,
+    };
+
+    VkSubpassDescription subpassDesc = {};
+    subpassDesc.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpassDesc.colorAttachmentCount    = array_size(colorRefs);
+    subpassDesc.pColorAttachments       = colorRefs;
+    subpassDesc.pDepthStencilAttachment = &depthRef;
+
+    VkAttachmentDescription attachmentDescs[] = {
+        colorDesc,
+        depthDesc,
+    };
+    Assert(attachmentCount == array_size(attachmentDescs));
+
+    VkSubpassDescription subpasses[] = {
+        subpassDesc,
+    };
+
+    VkRenderPassCreateInfo renderPassInfo = {};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.attachmentCount = array_size(attachmentDescs);
+    renderPassInfo.pAttachments    = attachmentDescs;
+    renderPassInfo.subpassCount    = array_size(subpasses);
+    renderPassInfo.pSubpasses      = subpasses;
+
+    result = vkCreateRenderPass(m_vkDevice, &renderPassInfo, getVkAlloc(),
+                                &m_vkRenderPass);
+    AssertVk(result);
+
+    VkFramebufferCreateInfo fbInfo = {};
+    fbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    fbInfo.renderPass = m_vkRenderPass;
+    fbInfo.width      = extent.width;
+    fbInfo.height     = extent.height;
+    fbInfo.layers     = extent.depth;
+
+    Info("VkFramebufferCreateInfo {\n"
+         "    renderPass = 0x%016x,\n"
+         "    width      = %u,\n"
+         "    height     = %u,\n"
+         "    depth      = %u\n"
+         "}",
+         m_vkRenderPass,
+         extent.width,
+         extent.height,
+         extent.depth
+    );
+
+    for (uint32_t i = 0; i < array_size(m_vkFramebuffers); i += 1) {
+        VkImageView attachmentsViews[Renderer::N] = {
+            m_vkPresentImageViews[i],
+            m_vkDepthImageView,
+        };
+        fbInfo.attachmentCount = array_size(attachmentsViews);
+        fbInfo.pAttachments    = attachmentsViews;
+
+        Info("Creating framebuffer #%u", i);
+        result = vkCreateFramebuffer(m_vkDevice, &fbInfo, getVkAlloc(),
+                                     &m_vkFramebuffers[i]);
+        AssertVk(result);
+    }
 
     return result;
 }
