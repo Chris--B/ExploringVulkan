@@ -17,11 +17,14 @@ add_executable(${DEMO_NAME}
     include/00-Prelude.hpp
     include/00-Prelude/Debug.hpp
     include/00-Prelude/Utils.hpp
+    include/OsUtil/Windows.hpp
+    include/OsUtil.hpp
     include/Renderer.hpp
 
     source/Main.cpp
     source/Debug.cpp
     source/Utils.cpp
+    source/OsUtil/Windows.cpp
     source/Renderer.cpp
 )
 

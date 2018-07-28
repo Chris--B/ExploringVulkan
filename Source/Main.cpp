@@ -142,6 +142,36 @@ int real_main(int argc, char** argv)
         Info("Working directory: %s", buffer);
     }
 
+    // List any extra Vulkan layers that will be loaded
+    #if OS_WINDOWS
+    // Explicit Layers
+    {
+        auto layers = queryExplicitLayers();
+        if (!layers.empty()) {
+            Info("%d Windows Registry Explicit Layers (0 means enabled)", layers.size());
+            for (auto const& layer : layers) {
+                auto layerName = "\"" + layer.name + "\"";
+                Info("    %-70s %d", layerName.c_str(), layer.data);
+            }
+        } else {
+            Info("No Windows Registry Explicit Layers");
+        }
+    }
+    // Implicit Layers
+    {
+        auto layers = queryImplicitLayers();
+        if (!layers.empty()) {
+            Info("%d Windows Registry Implicit Layers (0 means enabled)", layers.size());
+            for (auto const& layer : layers) {
+                auto layerName = "\"" + layer.name + "\"";
+                Info("    %-70s %d", layerName.c_str(), layer.data);
+            }
+        } else {
+            Info("No Windows Registry Implicit Layers");
+        }
+    }
+    #endif
+
     // ====
 
     UberContext ctx;
