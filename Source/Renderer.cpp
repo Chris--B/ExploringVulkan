@@ -437,6 +437,12 @@ VkResult Renderer::createDevice()
     AssertVk(result);
     Assert(m_vkDevice != nullptr);
 
+    vkGetDeviceQueue(m_vkDevice,
+                     queueFamilyIndex,
+                     0, // We only made 1
+                     &m_vkPresentQueue);
+    Assert(m_vkPresentQueue != nullptr);
+
     return result;
 }
 
@@ -564,10 +570,6 @@ VkResult Renderer::createPresentImages()
                                    &m_vkPresentImageViews[i]);
         AssertVk(result);
     }
-
-    // Where do I need this?
-    vkGetDeviceQueue(m_vkDevice, 0 /*queueFamilyIndex*/, 0 /*queueIndex*/,
-                     &m_vkPresentQueue);
 
     return result;
 }
