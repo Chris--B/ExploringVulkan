@@ -9,6 +9,7 @@ Renderer::~Renderer()
 
 void Renderer::deInit()
 {
+    vkDeviceWaitIdle(m_vkDevice);
     // TODO: Vulkan tear down
 }
 
@@ -54,13 +55,6 @@ VkResult Renderer::init(RendererInfo const& info)
         result = vkCreateSemaphore(m_vkDevice, &semaphoreInfo, getVkAlloc(),
                                    &m_vkRenderSemaphore);
         AssertVk(result);
-
-        VkFenceCreateInfo fenceInfo = {};
-        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        fenceInfo.flags = 0;
-        result = vkCreateFence(m_vkDevice, &fenceInfo, getVkAlloc(),
-                               &m_vkUnknownFence);
-        AssertVk(result);
     }
 
     // Init m_vkSurface
@@ -89,7 +83,44 @@ VkResult Renderer::init(RendererInfo const& info)
 
 void     Renderer::doOneFrame()
 {
+    VkResult result;
 
+    // Make a new command buffer
+    VkCommandBufferAllocateInfo cmdBufAllocInfo;
+    cmdBufAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    cmdBufAllocInfo.commandPool        = m_vkCommandPool;
+    cmdBufAllocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmdBufAllocInfo.commandBufferCount = 1;
+    VkCommandBuffer simpleDraw;
+    result = vkAllocateCommandBuffers(m_vkDevice, &cmdBufAllocInfo, &simpleDraw);
+    AssertVk(result);
+
+    // Begin
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = 0;
+    result = vkBeginCommandBuffer(simpleDraw, &beginInfo);
+    AssertVk(result);
+    {
+
+    }
+    // End
+    vkEndCommandBuffer(simpleDraw);
+
+    // Submit
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.waitSemaphoreCount   = 0;
+    submitInfo.commandBufferCount   = 1;
+    submitInfo.pCommandBuffers      = &simpleDraw;
+    submitInfo.signalSemaphoreCount = 0;
+
+    result = vkQueueSubmit(m_vkGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+
+    // Wait - Who needs synchronization anyway?
+    vkDeviceWaitIdle(m_vkDevice);
+
+    vkFreeCommandBuffers(m_vkDevice, m_vkCommandPool, 1, &simpleDraw);
 }
 
 VkResult Renderer::createLayers()

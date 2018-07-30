@@ -75,6 +75,8 @@ class Renderer
         VkPhysicalDevice            m_vkPhysicalDevice          = nullptr;
         VkDevice                    m_vkDevice                  = nullptr;
         VkAllocationCallbacks       m_vkAlloc                   = {}; // TODO
+        VkQueue                     m_vkGraphicsQueue           = nullptr;
+        uint32_t                    m_vkGraphicsQueueIndex      = -1;
 
         // Presentation objects
         static constexpr uint32_t   N                           = 2;
@@ -86,8 +88,6 @@ class Renderer
         VkSemaphore                 m_vkRenderSemaphore         = nullptr;
 
         // Rendering objects
-        VkQueue                     m_vkGraphicsQueue           = nullptr;
-        uint32_t                    m_vkGraphicsQueueIndex      = 0;
         VkRenderPass                m_vkRenderPass              = nullptr;
 
         // Pools
@@ -110,9 +110,6 @@ class Renderer
         // Shader Uniforms
         VkBuffer                    m_vkUniformBuffer           = nullptr;
         VkDeviceMemory              m_vkUniformDeviceMemory     = nullptr;
-
-        // ???
-        VkFence                     m_vkUnknownFence            = nullptr;
 
         QueriedVulkanInfo           m_queriedInfo;
 
