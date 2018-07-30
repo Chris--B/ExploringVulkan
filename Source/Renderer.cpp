@@ -43,7 +43,7 @@ VkResult Renderer::init(RendererInfo const& info)
     // Init m_vkPhysicalDevice
     result = createPhysicalDevice();
 
-    // Init m_vkDevice
+    // Init m_vkDevice and m_vkGraphicsQueue
     result = createDevice();
 
     // Init Semaphores and Fences.
@@ -51,9 +51,7 @@ VkResult Renderer::init(RendererInfo const& info)
         VkSemaphoreCreateInfo semaphoreInfo = {};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
         semaphoreInfo.flags = 0;
-        result = vkCreateSemaphore(m_vkDevice,
-                                   &semaphoreInfo,
-                                   getVkAlloc(),
+        result = vkCreateSemaphore(m_vkDevice, &semaphoreInfo, getVkAlloc(),
                                    &m_vkRenderSemaphore);
         AssertVk(result);
 
@@ -440,8 +438,8 @@ VkResult Renderer::createDevice()
     vkGetDeviceQueue(m_vkDevice,
                      queueFamilyIndex,
                      0, // We only made 1
-                     &m_vkPresentQueue);
-    Assert(m_vkPresentQueue != nullptr);
+                     &m_vkGraphicsQueue);
+    Assert(m_vkGraphicsQueue != nullptr);
 
     return result;
 }
@@ -580,7 +578,8 @@ VkResult Renderer::createCommandPool()
 
     VkCommandPoolCreateInfo poolInfo = {};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT |
+                     VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
     poolInfo.queueFamilyIndex = 0; // ??
 
     result = vkCreateCommandPool(m_vkDevice, &poolInfo, nullptr,

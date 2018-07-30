@@ -83,11 +83,10 @@ class Renderer
         VkImage                     m_vkPresentImages[N]        = {};
         VkImageView                 m_vkPresentImageViews[N]    = {};
         VkFramebuffer               m_vkFramebuffers[N]         = {};
-        VkQueue                     m_vkPresentQueue            = nullptr;
         VkSemaphore                 m_vkRenderSemaphore         = nullptr;
 
         // Rendering objects
-        VkCommandBuffer             m_vkDrawCmdBuffer           = nullptr;
+        VkQueue                     m_vkGraphicsQueue           = nullptr;
         VkRenderPass                m_vkRenderPass              = nullptr;
 
         // Pools
