@@ -398,19 +398,19 @@ VkResult Renderer::createDevice()
     }
 
     // Select a graphics queue (by index)
-    uint32_t queueFamilyIndex = 0;
     for (uint32_t i = 0; i < queueFamilies.size(); i += 1) {
-        // Take the last graphics queue that we find.
+        // Take the first graphics queue that we find.
         if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-            queueFamilyIndex = i;
+            m_vkGraphicsQueueIndex = i;
+            break;
         }
     }
-    Info("Using queue family #%d", queueFamilyIndex);
+    Info("Using queue family #%d for graphics", m_vkGraphicsQueueIndex);
 
     // Actually create the device
     VkDeviceQueueCreateInfo queueInfo = {};
     queueInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueInfo.queueFamilyIndex = queueFamilyIndex;
+    queueInfo.queueFamilyIndex = m_vkGraphicsQueueIndex;
     queueInfo.queueCount       = 1;
     const float queuePriority  = 1.0f;
     queueInfo.pQueuePriorities = &queuePriority;
@@ -436,7 +436,7 @@ VkResult Renderer::createDevice()
     Assert(m_vkDevice != nullptr);
 
     vkGetDeviceQueue(m_vkDevice,
-                     queueFamilyIndex,
+                     m_vkGraphicsQueueIndex,
                      0, // We only made 1
                      &m_vkGraphicsQueue);
     Assert(m_vkGraphicsQueue != nullptr);
@@ -459,9 +459,8 @@ VkResult Renderer::createSwapChain()
 
     // Is it even supported? lol
     VkBool32 surfaceIsSupported = VK_FALSE;
-    uint32_t queueFamilyIndex = 0;
     result = vkGetPhysicalDeviceSurfaceSupportKHR(m_vkPhysicalDevice,
-                                                  queueFamilyIndex,
+                                                  m_vkGraphicsQueueIndex,
                                                   m_vkSurface,
                                                   &surfaceIsSupported);
     AssertVk(result);
@@ -580,7 +579,7 @@ VkResult Renderer::createCommandPool()
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT |
                      VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    poolInfo.queueFamilyIndex = 0; // ??
+    poolInfo.queueFamilyIndex = m_vkGraphicsQueueIndex;
 
     result = vkCreateCommandPool(m_vkDevice, &poolInfo, nullptr,
                                  &m_vkCommandPool);

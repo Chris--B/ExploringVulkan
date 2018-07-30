@@ -87,6 +87,7 @@ class Renderer
 
         // Rendering objects
         VkQueue                     m_vkGraphicsQueue           = nullptr;
+        uint32_t                    m_vkGraphicsQueueIndex      = 0;
         VkRenderPass                m_vkRenderPass              = nullptr;
 
         // Pools
