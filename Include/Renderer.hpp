@@ -79,7 +79,7 @@ class Renderer
         uint32_t                    m_vkGraphicsQueueIndex      = -1;
 
         // Presentation objects
-        static constexpr uint32_t   N                           = 2;
+        static constexpr uint32_t   N                           = 3;
         VkSurfaceKHR                m_vkSurface                 = nullptr;
         VkSwapchainKHR              m_vkSwapchain               = nullptr;
         VkImage                     m_vkPresentImages[N]        = {};

@@ -494,6 +494,8 @@ VkResult Renderer::createSwapChain()
                                                        m_vkSurface,
                                                        &surfaceCapabilities);
     AssertVk(result);
+    Info("Surface Image Count: (%d, %d)", surfaceCapabilities.minImageCount,
+                                          surfaceCapabilities.maxImageCount);
 
     // Is it even supported? lol
     VkBool32 surfaceIsSupported = VK_FALSE;
@@ -546,7 +548,7 @@ VkResult Renderer::createSwapChain()
     VkSwapchainCreateInfoKHR swapchainInfo = {};
     swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     swapchainInfo.surface          = m_vkSurface;
-    swapchainInfo.minImageCount    = 2; // Double buffering
+    swapchainInfo.minImageCount    = 3;
     swapchainInfo.imageFormat      = VK_FORMAT_B8G8R8A8_UNORM;
     swapchainInfo.imageColorSpace  = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
     swapchainInfo.imageExtent      = surfaceCapabilities.currentExtent;
@@ -788,7 +790,7 @@ VkResult Renderer::createRenderPassAndFramebuffer(VkExtent3D const& extent)
     );
 
     for (uint32_t i = 0; i < array_size(m_vkFramebuffers); i += 1) {
-        VkImageView attachmentsViews[Renderer::N] = {
+        VkImageView attachmentsViews[2] = {
             m_vkPresentImageViews[i],
             m_vkDepthImageView,
         };
