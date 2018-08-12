@@ -283,8 +283,32 @@ int real_main(int argc, char** argv)
     while (!glfwWindowShouldClose(pWindow)) {
         glfwPollEvents();
 
-        renderer.doOneFrame();
+        if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
+            // Thumb sticks
+            int jsAxesCount;
+            const float* pJsAxes = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &jsAxesCount);
+            for (int axis = 0; axis < jsAxesCount; axis += 1) {
+                float value = pJsAxes[axis];
+                if (abs(value) < 0.05f) {
+                    value = 0.f;
+                }
+                if (value != 0.f) {
+                    Info("Joystick 0x1 axis %d: %f", axis, value);
+                }
+            }
 
+            // Buttons
+            int jsBtnCount;
+            const uint8_t* pJsBtns = glfwGetJoystickButtons(GLFW_JOYSTICK_1, &jsBtnCount);
+            for (int btn = 0; btn < jsBtnCount; btn += 1) {
+                uint8_t value = pJsBtns[btn];
+                if (value != 0) {
+                    Info("Joystick 0x1 btn %d: %d", btn, value);
+                }
+            }
+        }
+
+        renderer.doOneFrame();
     }
 
     glfwTerminate();
