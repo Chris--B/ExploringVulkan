@@ -88,6 +88,22 @@ void glfwFramebufferSizeCallback(GLFWwindow* pWindow,
     Info("GLFW Framebuffer resized -> (%d, %d)", width, height);
 }
 
+void glfwJoystickCallback(int jid, int event)
+{
+    if (event == GLFW_CONNECTED) {
+        const char* pJoystickName = glfwGetJoystickName(jid);
+        if (pJoystickName == nullptr) {
+            pJoystickName = "";
+            Bug("Glfw Joystick 0x%X connected a NULL name", jid);
+        }
+        Info("Joystick \"%s\" 0x%X connected.", pJoystickName, jid);
+    } else if (event == GLFW_DISCONNECTED) {
+        Info("Joystick 0x%X disconnected.", jid);
+    } else {
+        Bug("Unknown Glfw Joystick event: %x", event);
+    }
+}
+
 const char* getEnvVarOr(const char* pEnvName, const char* pDefaultStr = "")
 {
     const char* pValue = getenv(pEnvName);
@@ -147,7 +163,7 @@ int real_main(int argc, char** argv)
         }
     }
 
-    // Pick resolution, etc.
+    // Pick monitor, resolution, and fullscreen
     {
         GLFWmonitor* pMonitor = glfwGetPrimaryMonitor();
         const auto* pVidmode = glfwGetVideoMode(pMonitor);
@@ -171,6 +187,16 @@ int real_main(int argc, char** argv)
                                    nullptr // GLFWwindow* share
         );
         AssertMsg(pWindow != nullptr, "Unable to create a GLFW window");
+    }
+
+    // Inputs
+    {
+        glfwSetJoystickCallback(glfwJoystickCallback);
+        for (int jsId = GLFW_JOYSTICK_1; jsId <= GLFW_JOYSTICK_LAST; jsId += 1) {
+            if (glfwJoystickPresent(jsId)) {
+                Info("Found Joystick 0x%x: \"%s\"", jsId, glfwGetJoystickName(jsId));
+            }
+        }
     }
 
     // Set Glfw Callbacks
