@@ -267,7 +267,7 @@ int real_main(int argc, char** argv)
         Vec3 scale = 3.f / (max - min);
 
         Info("offset: (% 6.1f, % 6.1f, % 6.1f)", offset.x, offset.y, offset.z);
-        Info("scale:  (% 6.1f, % 6.1f, % 6.1f)", scale.x, scale.y, scale.z);
+        Info("scale:  (% 3.3f, % 3.3f, % 3.3f)", scale.x, scale.y, scale.z);
 
         for (const auto& shape : shapes) {
             for (const index_t& index : shape.mesh.indices) {

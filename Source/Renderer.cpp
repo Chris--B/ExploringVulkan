@@ -81,31 +81,38 @@ VkResult Renderer::init(RendererInfo const& info)
     return result;
 }
 
-void     Renderer::doOneFrame()
+void Renderer::doOneFrame()
 {
+    constexpr uint32_t frameId = 0;
     VkResult result;
 
-    // Make a new command buffer
+    VkExtent2D extent2d = {};
+    glfwGetFramebufferSize(m_pGlfwWindow,
+                           ptr_as<int>(&extent2d.width),
+                           ptr_as<int>(&extent2d.height));
+
     VkCommandBufferAllocateInfo cmdBufAllocInfo;
     cmdBufAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     cmdBufAllocInfo.commandPool        = m_vkCommandPool;
     cmdBufAllocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cmdBufAllocInfo.commandBufferCount = 1;
+
     VkCommandBuffer simpleDraw;
     result = vkAllocateCommandBuffers(m_vkDevice, &cmdBufAllocInfo, &simpleDraw);
     AssertVk(result);
 
-    // Begin
-    VkCommandBufferBeginInfo beginInfo = {};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = 0;
-    result = vkBeginCommandBuffer(simpleDraw, &beginInfo);
+    // Record CmdBuffer
+    VkCommandBufferBeginInfo cmdInfo = {};
+    cmdInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmdInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    result = vkBeginCommandBuffer(simpleDraw, &cmdInfo);
     AssertVk(result);
     {
 
     }
     // End
-    vkEndCommandBuffer(simpleDraw);
+    result = vkEndCommandBuffer(simpleDraw);
+    AssertVk(result);
 
     // Submit
     VkSubmitInfo submitInfo = {};
