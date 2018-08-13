@@ -47,15 +47,8 @@ VkResult Renderer::init(RendererInfo const& info)
     // Init m_vkDevice and m_vkGraphicsQueue
     result = createDevice();
 
-    // Init Semaphores and Fences.
-    {
-        VkSemaphoreCreateInfo semaphoreInfo = {};
-        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        semaphoreInfo.flags = 0;
-        result = vkCreateSemaphore(m_vkDevice, &semaphoreInfo, getVkAlloc(),
-                                   &m_vkRenderSemaphore);
-        AssertVk(result);
-    }
+    // Init m_vkAcquireFence and m_vkRenderSemaphore.
+    result = createFencesAndSemaphores();
 
     // Init m_vkSurface
     result = glfwCreateWindowSurface(m_vkInstance,
@@ -83,8 +76,22 @@ VkResult Renderer::init(RendererInfo const& info)
 
 void Renderer::doOneFrame()
 {
-    constexpr uint32_t frameId = 0;
     VkResult result;
+
+    uint32_t frameId = -1;
+    result = vkAcquireNextImageKHR(m_vkDevice,
+                                   m_vkSwapchain,
+                                   UINT64_MAX, // timeout (ns)
+                                   nullptr,    // semaphore
+                                   m_vkAcquireFence,
+                                   &frameId);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        return;
+    }
+    AssertVk(result);
+
+    vkWaitForFences(m_vkDevice, 1, &m_vkAcquireFence, true, UINT64_MAX);
+    Assert(frameId < Renderer::N);
 
     VkExtent2D extent2d = {};
     glfwGetFramebufferSize(m_pGlfwWindow,
@@ -108,7 +115,32 @@ void Renderer::doOneFrame()
     result = vkBeginCommandBuffer(simpleDraw, &cmdInfo);
     AssertVk(result);
     {
+        VkRenderPassBeginInfo passInfo = {};
+        passInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        passInfo.renderPass  = m_vkRenderPass;
+        passInfo.framebuffer = m_vkFramebuffers[frameId];
+        passInfo.renderArea.extent = extent2d;
 
+        VkClearValue clearValues[2] = {};
+        float c = 25.f / 255.f;
+        clearValues[0].color = { 1.f, 0.f, 1.f };
+        clearValues[1].depthStencil = { 1.f, 0 };
+        passInfo.clearValueCount = array_size(clearValues);
+        passInfo.pClearValues    = clearValues;
+
+        vkCmdBeginRenderPass(simpleDraw,
+                             &passInfo,
+                             VK_SUBPASS_CONTENTS_INLINE);
+        VkViewport viewport = {};
+        viewport.x        = 0.f;
+        viewport.y        = as<float>(extent2d.height);
+        viewport.width    = as<float>(extent2d.width);
+        viewport.height   = -as<float>(extent2d.height);
+        viewport.minDepth = 0.f;
+        viewport.maxDepth = 1.f;
+        vkCmdSetViewport(simpleDraw, 0, 1, &viewport);
+
+        vkCmdEndRenderPass(simpleDraw);
     }
     // End
     result = vkEndCommandBuffer(simpleDraw);
@@ -117,17 +149,26 @@ void Renderer::doOneFrame()
     // Submit
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.waitSemaphoreCount   = 0;
     submitInfo.commandBufferCount   = 1;
     submitInfo.pCommandBuffers      = &simpleDraw;
-    submitInfo.signalSemaphoreCount = 0;
-
     result = vkQueueSubmit(m_vkGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+
+    // Present
+    VkPresentInfoKHR presentInfo = {};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.swapchainCount      = 1;
+    presentInfo.pSwapchains         = &m_vkSwapchain;
+    presentInfo.pImageIndices       = &frameId;
+    result = vkQueuePresentKHR(m_vkGraphicsQueue, &presentInfo);
+    if (result != VK_SUCCESS) {
+        Bug("vkQueuePresentKHR() -> %s", ToCStr(result));
+    }
 
     // Wait - Who needs synchronization anyway?
     vkDeviceWaitIdle(m_vkDevice);
 
     vkFreeCommandBuffers(m_vkDevice, m_vkCommandPool, 1, &simpleDraw);
+    vkResetFences(m_vkDevice, 1, &m_vkAcquireFence);
 }
 
 VkResult Renderer::createLayers()
@@ -478,6 +519,26 @@ VkResult Renderer::createDevice()
                      0, // We only made 1
                      &m_vkGraphicsQueue);
     Assert(m_vkGraphicsQueue != nullptr);
+
+    return result;
+}
+
+VkResult Renderer::createFencesAndSemaphores()
+{
+    VkResult result;
+    VkFenceCreateInfo fenceInfo = {};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.flags = 0;
+    result = vkCreateFence(m_vkDevice, &fenceInfo, getVkAlloc(),
+                           &m_vkAcquireFence);
+    AssertVk(result);
+
+    VkSemaphoreCreateInfo semaphoreInfo = {};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    semaphoreInfo.flags = 0;
+    result = vkCreateSemaphore(m_vkDevice, &semaphoreInfo, getVkAlloc(),
+                               &m_vkRenderSemaphore);
+    AssertVk(result);
 
     return result;
 }

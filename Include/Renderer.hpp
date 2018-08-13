@@ -85,6 +85,7 @@ class Renderer
         VkImage                     m_vkPresentImages[N]        = {};
         VkImageView                 m_vkPresentImageViews[N]    = {};
         VkFramebuffer               m_vkFramebuffers[N]         = {};
+        VkFence                     m_vkAcquireFence            = nullptr;
         VkSemaphore                 m_vkRenderSemaphore         = nullptr;
 
         // Rendering objects
@@ -120,6 +121,7 @@ class Renderer
         VkResult createInstance();
         VkResult createPhysicalDevice();
         VkResult createDevice();
+        VkResult createFencesAndSemaphores();
         VkResult createSwapChain();
         VkResult createPresentImages();
         VkResult createCommandPool();
