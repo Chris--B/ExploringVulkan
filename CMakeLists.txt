@@ -72,11 +72,6 @@ add_subdirectory("${EXTERNAL_DIR}/glm")
 target_include_directories(${DEMO_NAME} PRIVATE "${EXTERNAL_DIR}/glm")
 set_target_properties(glm_dummy PROPERTIES FOLDER "${EXTERNAL_IDE_FOLDER}")
 
-# stb
-add_subdirectory("${EXTERNAL_DIR}/stb")
-target_include_directories(${DEMO_NAME} PRIVATE "${EXTERNAL_DIR}/stb")
-set_target_properties(stb PROPERTIES FOLDER "${EXTERNAL_IDE_FOLDER}")
-
 # tinyobj
 add_subdirectory("${EXTERNAL_DIR}/tinyobjloader")
 target_include_directories(${DEMO_NAME} PRIVATE "${EXTERNAL_DIR}/tinyobjloader")
