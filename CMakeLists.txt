@@ -68,6 +68,9 @@ else()
 endif()
 
 # glm
+option(GLM_TEST_ENABLE_CXX_17    "" ON)
+option(GLM_TEST_ENABLE_SIMD_AVX  "" ON)
+add_definitions(-DGLM_ENABLE_EXPERIMENTAL)
 add_subdirectory("${EXTERNAL_DIR}/glm")
 target_include_directories(${DEMO_NAME} PRIVATE "${EXTERNAL_DIR}/glm")
 set_target_properties(glm_dummy PROPERTIES FOLDER "${EXTERNAL_IDE_FOLDER}")
@@ -80,7 +83,6 @@ set_target_properties(tinyobjloader PROPERTIES FOLDER "${EXTERNAL_IDE_FOLDER}")
 target_link_libraries("${DEMO_NAME}"
     ${Vulkan_LIBRARY}
     glfw
-    stb
     tinyobjloader
 )
 
